@@ -11,7 +11,7 @@ def load_coeffs(filename):
     """
     gh = []
     gh2arr = []
-    
+
     # Try multiple possible locations for the coefficients file
     possible_paths = [
         filename,
@@ -20,9 +20,18 @@ def load_coeffs(filename):
         '/opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF/src/igrf14coeffs.txt',
         '/opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF/src/igrf14coeffs.txt',
         '/opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF/src/igrf14coeffs.txt',
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'custom_igrf14coeffs.txt')
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'custom_igrf14coeffs.txt'),
+        # Additional paths to try
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'site-packages', 'pyIGRF', 'src', 'igrf14coeffs.txt'),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'custom_igrf14coeffs.txt'),
+        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'site-packages', 'pyIGRF', 'src', 'igrf14coeffs.txt'),
+        # Try absolute paths
+        '/app/custom_igrf14coeffs.txt',
+        '/app/site-packages/pyIGRF/src/igrf14coeffs.txt',
+        '/opt/render/project/src/custom_igrf14coeffs.txt',
+        '/opt/render/project/src/site-packages/pyIGRF/src/igrf14coeffs.txt'
     ]
-    
+
     # Try each path until we find one that works
     for path in possible_paths:
         try:
@@ -48,13 +57,13 @@ def load_coeffs(filename):
         except Exception as e:
             print(f"Failed to open coefficients file at {path}: {e}")
             continue
-    
+
     # If we get here, we couldn't find the file anywhere
     print("ERROR: Could not find igrf14coeffs.txt in any of the expected locations.")
     print("Searched in:")
     for path in possible_paths:
         print(f"  - {path}")
-    
+
     # Create a dummy coefficients file with minimal data to prevent crashes
     print("Creating dummy coefficients to prevent crashes...")
     # Return a minimal set of coefficients to prevent crashes
@@ -107,13 +116,13 @@ def get_coeffs(date):
             #     19 is the number of SH models that extend to degree 10
             ll = 120 * 19 + nc * ll
         tc = 1.0 - t
-    
+
     # Check if we have enough coefficients
     if len(gh) < ll + nc:
         print(f"Warning: Not enough coefficients. Need at least {ll + nc}, but only have {len(gh)}")
         # Extend the list if needed
         gh.extend([0.0] * (ll + nc - len(gh) + 1))
-    
+
     # print(tc, t)
     g, h = [], []
     temp = ll-1
