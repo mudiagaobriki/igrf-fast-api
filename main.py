@@ -139,6 +139,7 @@ async def compute_pyigrf(request: Request):
         try:
             # If the body is a JSON object, parse it
             data = json.loads(body_str)
+            print("Data: ", data)
 
             # Check if the data has a points_json field
             if isinstance(data, dict) and "points_json" in data:
@@ -179,6 +180,7 @@ async def compute_pyigrf(request: Request):
                         # If that fails, try stripping quotes and replacing escaped quotes
                         parsed_body = json.loads(body_str.strip('"').replace('\\"', '"'))
 
+                    print("Parsed body: ", parsed_body)
                     # Check if parsed_body has a points_json field
                     if isinstance(parsed_body, dict) and "points_json" in parsed_body:
                         points_data = parsed_body["points_json"]
