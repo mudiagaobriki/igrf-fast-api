@@ -161,20 +161,43 @@ curl -X POST "https://your-service-name.onrender.com/pyigrf" \
 
 #### POST /pyigrf Input Format
 
-The input to the POST /pyigrf endpoint should be a JSON object with a `points_json` field containing a stringified JSON string. The stringified JSON should be an object with a `points_json` field containing an array of points. Each point should be an object with the following fields:
+The POST /pyigrf endpoint now supports multiple input formats for flexibility:
+
+1. **Standard Format** - A JSON object with a `points_json` field containing a stringified JSON string:
+   ```json
+   {
+     "points_json": "{\"points_json\":[{\"latitude\":\"13.9375\",\"longitude\":\"4.0625\",\"altitude\":\"253.74992\",\"year\":\"2024.9\"}]}"
+   }
+   ```
+
+2. **Direct Format** - A JSON object with a `points_json` field containing an array of points directly:
+   ```json
+   {
+     "points_json": [
+       {"latitude":"13.9375","longitude":"4.0625","altitude":"253.74992","year":"2024.9"},
+       {"latitude":"13.9375","longitude":"4.1875","altitude":"255.7499","year":"2024.9"}
+     ]
+   }
+   ```
+
+3. **Raw String Format** - A stringified JSON string containing a `points_json` field with an array of points:
+   ```
+   "{\"points_json\":[{\"latitude\":\"13.9375\",\"longitude\":\"4.0625\",\"altitude\":\"253.74992\",\"year\":\"2024.9\"},{\"latitude\":\"13.9375\",\"longitude\":\"4.1875\",\"altitude\":\"255.7499\",\"year\":\"2024.9\"}]}"
+   ```
+
+4. **Raw Array Format** - A stringified JSON array of points:
+   ```
+   "[{\"latitude\":\"13.9375\",\"longitude\":\"4.0625\",\"altitude\":\"253.74992\",\"year\":\"2024.9\"},{\"latitude\":\"13.9375\",\"longitude\":\"4.1875\",\"altitude\":\"255.7499\",\"year\":\"2024.9\"}]"
+   ```
+
+Each point in the array should be an object with the following fields:
 
 - `latitude`: Latitude in degrees (string)
 - `longitude`: Longitude in degrees (string)
 - `altitude`: Altitude in kilometers (string)
 - `year`: Year (string)
 
-Example input:
-
-```json
-{
-  "points_json": "{\"points_json\":[{\"latitude\":\"13.9375\",\"longitude\":\"4.0625\",\"altitude\":\"253.74992\",\"year\":\"2024.9\"},{\"latitude\":\"13.9375\",\"longitude\":\"4.1875\",\"altitude\":\"255.7499\",\"year\":\"2024.9\"}]}"
-}
-```
+For backward compatibility, the original endpoint is still available at `/pyigrf/model` and expects the Standard Format.
 
 #### POST /pyigrf Output Format
 
