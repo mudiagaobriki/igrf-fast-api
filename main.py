@@ -66,15 +66,15 @@ async def compute_pyigrf(point_array: StringifiedPointArray):
         # The parsed data is already a JSON object with a "points_json" field
         points_data = parsed_data["points_json"]
         results = []
-        for point in points_data:
-            # Each point is an object with latitude, longitude, altitude, and year fields
-            lat = float(point["latitude"])
-            long = float(point["longitude"])
-            altitude = float(point["altitude"])
-            year = float(point["year"])
-            # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
-            result = pyIGRF.igrf_variation(long, lat, altitude, year)
-            results.append(result)
+        # for point in points_data:
+        #     # Each point is an object with latitude, longitude, altitude, and year fields
+        #     lat = float(point["latitude"])
+        #     long = float(point["longitude"])
+        #     altitude = float(point["altitude"])
+        #     year = float(point["year"])
+        #     # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
+        #     result = pyIGRF.igrf_variation(long, lat, altitude, year)
+        #     results.append(result)
         return results
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format")
