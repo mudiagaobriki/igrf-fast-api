@@ -121,67 +121,143 @@ async def compute_pyigrf(request: Request):
         # Get the raw request body
         body = await request.body()
         body_str = body.decode('utf-8')
+        print(f"Raw request body: {body_str}")
 
         # Try to parse the body as JSON
         try:
             # If the body is a JSON object, parse it
             data = json.loads(body_str)
+            print(f"Parsed JSON data: {data}")
 
             # Check if the data has a points_json field
             if isinstance(data, dict) and "points_json" in data:
                 # If it does, use that as the points_json string
                 points_json_str = data["points_json"]
+                print(f"Found points_json field: {points_json_str}")
 
                 # Try to parse the points_json string as JSON
                 try:
-                    parsed_points = json.loads(points_json_str)
+                    # Check if points_json_str is already a list
+                    if isinstance(points_json_str, list):
+                        print("points_json is already a list, using directly")
+                        parsed_points = points_json_str
+                    else:
+                        # Try to parse as JSON string
+                        parsed_points = json.loads(points_json_str)
+                    print(f"Parsed points_json: {parsed_points}")
 
                     # Check if parsed_points has a points_json field
                     if isinstance(parsed_points, dict) and "points_json" in parsed_points:
                         points_data = parsed_points["points_json"]
+                        print(f"Found nested points_json field: {points_data}")
                     else:
                         # If not, assume the parsed data is the array of points directly
                         points_data = parsed_points
-                except json.JSONDecodeError:
-                    # If points_json is not valid JSON, raise an error
-                    raise HTTPException(status_code=400, detail="Invalid JSON format in points_json field")
+                        print(f"Using parsed data directly: {points_data}")
+                except json.JSONDecodeError as e:
+                    print(f"JSONDecodeError parsing points_json: {e}")
+                    # If points_json is not valid JSON, try using it directly
+                    if isinstance(points_json_str, list):
+                        print("points_json is a list but not valid JSON, using directly")
+                        points_data = points_json_str
+                    else:
+                        # If it's not a list, raise an error
+                        raise HTTPException(status_code=400, detail=f"Invalid JSON format in points_json field: {str(e)}")
             else:
                 # If the body is not a JSON object with a points_json field,
                 # assume it's a raw JSON string that needs to be parsed
                 try:
                     # Try to parse the body as a JSON string
-                    parsed_body = json.loads(body_str.strip('"').replace('\\"', '"'))
+                    # First, try without any modifications
+                    try:
+                        parsed_body = json.loads(body_str)
+                        print(f"Parsed body without modifications: {parsed_body}")
+                    except json.JSONDecodeError:
+                        # If that fails, try stripping quotes and replacing escaped quotes
+                        parsed_body = json.loads(body_str.strip('"').replace('\\"', '"'))
+                        print(f"Parsed body after stripping quotes: {parsed_body}")
 
                     # Check if parsed_body has a points_json field
                     if isinstance(parsed_body, dict) and "points_json" in parsed_body:
                         points_data = parsed_body["points_json"]
+                        print(f"Found points_json field in parsed body: {points_data}")
                     else:
                         # If not, assume the parsed data is the array of points directly
                         points_data = parsed_body
-                except json.JSONDecodeError:
-                    # If the body is not valid JSON, raise an error
-                    raise HTTPException(status_code=400, detail="Invalid JSON format in request body")
-        except json.JSONDecodeError:
+                        print(f"Using parsed body directly: {points_data}")
+                except json.JSONDecodeError as e:
+                    print(f"JSONDecodeError parsing body as string: {e}")
+                    # If the body is not valid JSON, try one more approach
+                    try:
+                        # Try parsing with different quote handling
+                        parsed_body = json.loads(body_str.replace('\\', '').replace('"{', '{').replace('}"', '}'))
+                        print(f"Parsed body with alternative quote handling: {parsed_body}")
+
+                        # Check if parsed_body has a points_json field
+                        if isinstance(parsed_body, dict) and "points_json" in parsed_body:
+                            points_data = parsed_body["points_json"]
+                            print(f"Found points_json field in alternatively parsed body: {points_data}")
+                        else:
+                            # If not, assume the parsed data is the array of points directly
+                            points_data = parsed_body
+                            print(f"Using alternatively parsed body directly: {points_data}")
+                    except json.JSONDecodeError as e2:
+                        print(f"JSONDecodeError with alternative parsing: {e2}")
+                        # If all parsing attempts fail, raise an error
+                        raise HTTPException(status_code=400, detail=f"Invalid JSON format in request body: {str(e)}")
+        except json.JSONDecodeError as e:
+            print(f"JSONDecodeError parsing body: {e}")
             # If the body is not valid JSON, raise an error
-            raise HTTPException(status_code=400, detail="Invalid JSON format in request body")
+            raise HTTPException(status_code=400, detail=f"Invalid JSON format in request body: {str(e)}")
+
+        # Ensure points_data is a list
+        if not isinstance(points_data, list):
+            print(f"points_data is not a list: {points_data}")
+            if isinstance(points_data, dict):
+                # If it's a single point as a dict, wrap it in a list
+                points_data = [points_data]
+                print(f"Wrapped single point in list: {points_data}")
+            else:
+                raise HTTPException(status_code=400, detail=f"Expected points_data to be a list, got {type(points_data).__name__}")
 
         # Process the points data
+        print(f"Processing {len(points_data)} points")
         results = []
-        for point in points_data:
+        for i, point in enumerate(points_data):
+            print(f"Processing point {i}: {point}")
             # Each point is an object with latitude, longitude, altitude, and year fields
-            lat = float(point["latitude"])
-            long = float(point["longitude"])
-            altitude = float(point["altitude"])
-            year = float(point["year"])
-            # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
-            result = pyIGRF.igrf_variation(long, lat, altitude, year)
-            results.append(result)
+            try:
+                lat = float(point["latitude"])
+                long = float(point["longitude"])
+                altitude = float(point["altitude"])
+                year = float(point["year"])
+                print(f"Extracted values: lat={lat}, long={long}, altitude={altitude}, year={year}")
+                # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
+                result = pyIGRF.igrf_variation(long, lat, altitude, year)
+                print(f"Result for point {i}: {result}")
+                results.append(result)
+            except KeyError as e:
+                print(f"KeyError for point {i}: {e}")
+                raise HTTPException(status_code=400, detail=f"Missing field in point {i}: {str(e)}")
+            except ValueError as e:
+                print(f"ValueError for point {i}: {e}")
+                raise HTTPException(status_code=400, detail=f"Invalid value in point {i}: {str(e)}")
+            except Exception as e:
+                print(f"Unexpected error processing point {i}: {e}")
+                raise HTTPException(status_code=500, detail=f"Error processing point {i}: {str(e)}")
+
+        print(f"Returning {len(results)} results")
         return results
     except json.JSONDecodeError as e:
+        print(f"JSONDecodeError in outer try block: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
     except (KeyError, ValueError) as e:
+        print(f"KeyError or ValueError in outer try block: {e}")
         raise HTTPException(status_code=400, detail=f"Invalid point format. Each point should be an object with 'latitude', 'longitude', 'altitude', and 'year' fields. Error: {str(e)}")
     except Exception as e:
+        print(f"Unexpected error in outer try block: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 # Keep the original endpoint for backward compatibility

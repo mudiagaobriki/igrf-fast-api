@@ -190,6 +190,18 @@ The POST /pyigrf endpoint now supports multiple input formats for flexibility:
    "[{\"latitude\":\"13.9375\",\"longitude\":\"4.0625\",\"altitude\":\"253.74992\",\"year\":\"2024.9\"},{\"latitude\":\"13.9375\",\"longitude\":\"4.1875\",\"altitude\":\"255.7499\",\"year\":\"2024.9\"}]"
    ```
 
+5. **Direct JSON Format** - A JSON object with a `points_json` field containing an array of points, sent directly as the request body:
+   ```json
+   {"points_json":[{"latitude":"13.9375","longitude":"4.0625","altitude":"253.74992","year":"2024.9"},{"latitude":"13.9375","longitude":"4.1875","altitude":"255.7499","year":"2024.9"}]}
+   ```
+
+6. **Single Point Format** - A single point object, which will be automatically wrapped in an array:
+   ```json
+   {"latitude":"13.9375","longitude":"4.0625","altitude":"253.74992","year":"2024.9"}
+   ```
+
+The endpoint includes robust error handling and will attempt multiple parsing strategies to accommodate various input formats. If a parsing error occurs, a detailed error message will be returned to help diagnose the issue.
+
 Each point in the array should be an object with the following fields:
 
 - `latitude`: Latitude in degrees (string)
