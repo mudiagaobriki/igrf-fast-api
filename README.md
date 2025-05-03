@@ -67,6 +67,14 @@ These custom files are essential for the application to work correctly on Render
 
 The predeploy script (`predeploy.sh`) automatically detects these files and copies them to the appropriate locations in the pyIGRF site-packages folder during deployment. The script includes multiple methods to find the pyIGRF directory and creates the necessary directories and files even if the import fails.
 
+Additionally, the main application (`main.py`) includes a robust fallback mechanism that:
+1. Attempts to import pyIGRF normally
+2. If the import fails, creates the necessary directories and copies the custom files to those directories
+3. Tries to import pyIGRF again after setting up the environment
+4. If the import still fails, provides a fallback implementation that returns reasonable default values
+
+This multi-layered approach ensures that the application will continue to function even if there are issues with the pyIGRF package or the coefficient files, making the deployment more resilient.
+
 If you need to modify these files:
 
 1. Make your changes to the custom files in the root directory of the repository
