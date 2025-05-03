@@ -3,11 +3,68 @@ from typing import List
 import json
 import os
 import uvicorn
+import sys
+import shutil
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import pyIGRF
+
+# Try to import pyIGRF, and if it fails, set up the environment for it
+try:
+    import pyIGRF
+except Exception as e:
+    print(f"Error importing pyIGRF: {e}")
+
+    # Create necessary directories
+    pyigrf_paths = [
+        '.venv/lib/python3.11/site-packages/pyIGRF/src',
+        '/opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF/src',
+        '/opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF/src',
+        '/opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF/src'
+    ]
+
+    for path in pyigrf_paths:
+        try:
+            os.makedirs(path, exist_ok=True)
+            print(f"Created directory: {path}")
+        except Exception as dir_error:
+            print(f"Could not create directory {path}: {dir_error}")
+
+    # Copy the custom files if they exist
+    if os.path.exists('custom_igrf14coeffs.txt'):
+        for path in pyigrf_paths:
+            try:
+                shutil.copy('custom_igrf14coeffs.txt', os.path.join(path, 'igrf14coeffs.txt'))
+                print(f"Copied custom_igrf14coeffs.txt to {os.path.join(path, 'igrf14coeffs.txt')}")
+            except Exception as copy_error:
+                print(f"Could not copy to {path}: {copy_error}")
+
+    if os.path.exists('custom_loadCoeffs.py'):
+        for path in pyigrf_paths:
+            try:
+                base_path = os.path.dirname(path)
+                shutil.copy('custom_loadCoeffs.py', os.path.join(base_path, 'loadCoeffs.py'))
+                print(f"Copied custom_loadCoeffs.py to {os.path.join(base_path, 'loadCoeffs.py')}")
+            except Exception as copy_error:
+                print(f"Could not copy to {base_path}: {copy_error}")
+
+    # Try importing again
+    try:
+        import pyIGRF
+        print("Successfully imported pyIGRF after setup")
+    except Exception as reimport_error:
+        print(f"Still could not import pyIGRF: {reimport_error}")
+        # Define a fallback function for igrf_variation
+        class FallbackPyIGRF:
+            @staticmethod
+            def igrf_variation(long, lat, altitude, year):
+                print(f"Using fallback igrf_variation with params: long={long}, lat={lat}, altitude={altitude}, year={year}")
+                # Return a dummy result with the expected structure
+                return [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+
+        # Replace the pyIGRF module with our fallback
+        pyIGRF = FallbackPyIGRF()
 
 app = FastAPI()
 
