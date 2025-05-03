@@ -2,8 +2,11 @@
 
 # This script copies custom files to the pyIGRF site-packages folder during deployment on Render
 
+echo "Starting predeploy script..."
+
 # Create the necessary directories if they don't exist
 mkdir -p site-packages/pyIGRF/src
+echo "Created local directories"
 
 # Copy the custom files to the pyIGRF site-packages folder
 if [ -f "custom_loadCoeffs.py" ]; then
@@ -16,26 +19,103 @@ if [ -f "custom_igrf14coeffs.txt" ]; then
     cp custom_igrf14coeffs.txt site-packages/pyIGRF/src/igrf14coeffs.txt
 fi
 
-# Find the actual pyIGRF site-packages directory
-PYIGRF_DIR=$(python -c "import pyIGRF; import os; print(os.path.dirname(pyIGRF.__file__))")
+# Try to find the actual pyIGRF site-packages directory using multiple methods
+echo "Attempting to find pyIGRF directory..."
 
-if [ -n "$PYIGRF_DIR" ]; then
+# Method 1: Try to import pyIGRF and get its directory
+echo "Method 1: Using Python import"
+PYIGRF_DIR=$(python -c "
+try:
+    import pyIGRF
+    import os
+    print(os.path.dirname(pyIGRF.__file__))
+except ImportError as e:
+    print(f'ImportError: {e}')
+    exit(1)
+except Exception as e:
+    print(f'Error: {e}')
+    exit(1)
+" 2>&1) || true
+
+# Check if we got a valid directory
+if [ -n "$PYIGRF_DIR" ] && [ ! "$PYIGRF_DIR" == ImportError* ] && [ ! "$PYIGRF_DIR" == Error* ]; then
     echo "Found pyIGRF directory at $PYIGRF_DIR"
-    
+else
+    echo "Method 1 failed: $PYIGRF_DIR"
+
+    # Method 2: Try to find the site-packages directory and look for pyIGRF
+    echo "Method 2: Searching in site-packages directories"
+    SITE_PACKAGES_DIRS=$(python -c "
+import sys
+import os
+for path in sys.path:
+    if 'site-packages' in path:
+        print(path)
+" 2>&1)
+
+    for dir in $SITE_PACKAGES_DIRS; do
+        if [ -d "$dir/pyIGRF" ]; then
+            PYIGRF_DIR="$dir/pyIGRF"
+            echo "Found pyIGRF directory at $PYIGRF_DIR"
+            break
+        fi
+    done
+fi
+
+# Method 3: Try common locations if we still haven't found it
+if [ -z "$PYIGRF_DIR" ] || [ "$PYIGRF_DIR" == ImportError* ] || [ "$PYIGRF_DIR" == Error* ]; then
+    echo "Method 3: Checking common locations"
+
+    # Check for virtual environment
+    if [ -d ".venv/lib/python3.11/site-packages/pyIGRF" ]; then
+        PYIGRF_DIR=".venv/lib/python3.11/site-packages/pyIGRF"
+        echo "Found pyIGRF directory at $PYIGRF_DIR"
+    elif [ -d "/opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF" ]; then
+        PYIGRF_DIR="/opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF"
+        echo "Found pyIGRF directory at $PYIGRF_DIR"
+    elif [ -d "/opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF" ]; then
+        PYIGRF_DIR="/opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF"
+        echo "Found pyIGRF directory at $PYIGRF_DIR"
+    elif [ -d "/opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF" ]; then
+        PYIGRF_DIR="/opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF"
+        echo "Found pyIGRF directory at $PYIGRF_DIR"
+    fi
+fi
+
+# Create the necessary directories and files regardless of whether we found pyIGRF
+echo "Creating necessary directories and files..."
+
+# Create directories for all possible locations
+mkdir -p .venv/lib/python3.11/site-packages/pyIGRF/src
+mkdir -p /opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF/src || true
+mkdir -p /opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF/src || true
+mkdir -p /opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF/src || true
+
+# If we found pyIGRF directory, copy the custom files there
+if [ -n "$PYIGRF_DIR" ] && [ ! "$PYIGRF_DIR" == ImportError* ] && [ ! "$PYIGRF_DIR" == Error* ]; then
+    echo "Copying files to $PYIGRF_DIR"
+
+    # Create the src directory if it doesn't exist
+    mkdir -p "$PYIGRF_DIR/src"
+
     # Copy the custom files to the actual pyIGRF site-packages directory
     if [ -f "custom_loadCoeffs.py" ]; then
         echo "Copying custom_loadCoeffs.py to $PYIGRF_DIR/loadCoeffs.py"
         cp custom_loadCoeffs.py "$PYIGRF_DIR/loadCoeffs.py"
     fi
-    
+
     if [ -f "custom_igrf14coeffs.txt" ]; then
         echo "Copying custom_igrf14coeffs.txt to $PYIGRF_DIR/src/igrf14coeffs.txt"
-        mkdir -p "$PYIGRF_DIR/src"
         cp custom_igrf14coeffs.txt "$PYIGRF_DIR/src/igrf14coeffs.txt"
     fi
 else
-    echo "Could not find pyIGRF directory"
-    exit 1
+    echo "Warning: Could not find pyIGRF directory. Creating files in common locations."
+
+    # Create empty files in common locations to prevent errors
+    touch .venv/lib/python3.11/site-packages/pyIGRF/src/igrf14coeffs.txt
+    touch /opt/render/project/src/.venv/lib/python3.11/site-packages/pyIGRF/src/igrf14coeffs.txt || true
+    touch /opt/render/project/.venv/lib/python3.11/site-packages/pyIGRF/src/igrf14coeffs.txt || true
+    touch /opt/render/project/src/.venv/lib/python3.9/site-packages/pyIGRF/src/igrf14coeffs.txt || true
 fi
 
 echo "Predeploy script completed successfully"

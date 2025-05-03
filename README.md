@@ -58,15 +58,19 @@ No additional environment variables are required for this application.
 
 ### Custom Files for pyIGRF
 
-The application uses the pyIGRF package to calculate IGRF variations. If you have custom versions of the following files, you can include them in your repository and they will be automatically copied to the pyIGRF site-packages folder during deployment:
+The application uses the pyIGRF package to calculate IGRF variations. The repository includes custom versions of the following files that are automatically copied to the pyIGRF site-packages folder during deployment:
 
-- `custom_loadCoeffs.py`: A custom version of the loadCoeffs.py file from the pyIGRF package
+- `custom_loadCoeffs.py`: A custom version of the loadCoeffs.py file from the pyIGRF package with improved error handling
 - `custom_igrf14coeffs.txt`: A custom version of the igrf14coeffs.txt file from the pyIGRF package
 
-To use custom files:
+These custom files are essential for the application to work correctly on Render. The `custom_loadCoeffs.py` file includes improved error handling and fallback mechanisms to prevent the application from crashing if the coefficient file can't be found. The `custom_igrf14coeffs.txt` file contains the IGRF coefficients needed for the calculations.
 
-1. Place your custom files in the root directory of your repository with the names `custom_loadCoeffs.py` and/or `custom_igrf14coeffs.txt`
-2. The predeploy script will automatically detect these files and copy them to the appropriate locations in the pyIGRF site-packages folder during deployment
+The predeploy script (`predeploy.sh`) automatically detects these files and copies them to the appropriate locations in the pyIGRF site-packages folder during deployment. The script includes multiple methods to find the pyIGRF directory and creates the necessary directories and files even if the import fails.
+
+If you need to modify these files:
+
+1. Make your changes to the custom files in the root directory of the repository
+2. The predeploy script will automatically copy the updated files to the appropriate locations during deployment
 
 ### Deployment Steps
 
@@ -123,11 +127,17 @@ To use custom files:
    - Verify that the Procfile contains the correct command to start the application
    - Check that the application is listening on the port specified by the PORT environment variable
    - If you encounter CORS issues, verify that the CORS middleware is correctly configured
-   - If you're using custom files for pyIGRF:
-     - Check that the custom files are correctly named (`custom_loadCoeffs.py` and/or `custom_igrf14coeffs.txt`)
+   - If you encounter a `FileNotFoundError` related to `igrf14coeffs.txt`:
+     - This is a known issue that occurs when the pyIGRF package can't find its coefficient file
+     - The repository includes custom files and a predeploy script to address this issue
+     - Verify that the custom files (`custom_loadCoeffs.py` and `custom_igrf14coeffs.txt`) are present in the repository
      - Verify that the predeploy script has execute permissions (`chmod +x predeploy.sh`)
      - Check the build logs for any errors related to the predeploy script
      - If the predeploy script fails, you can manually copy the custom files to the pyIGRF site-packages folder after deployment
+   - If you're still encountering issues with the pyIGRF package:
+     - The custom_loadCoeffs.py file includes fallback mechanisms to prevent crashes
+     - Check the application logs for messages about coefficient file locations
+     - You may need to modify the custom_loadCoeffs.py file to add additional fallback paths
 
 ### Testing the Deployed API
 
