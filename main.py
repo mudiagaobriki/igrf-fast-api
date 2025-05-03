@@ -1,13 +1,24 @@
 from pyclbr import Class
 from typing import List
 import json
+import os
 import uvicorn
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import pyIGRF
 
 app = FastAPI()
+
+# Add CORS middleware to allow cross-origin requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 class DataPoint(BaseModel):
     long: float
@@ -70,7 +81,10 @@ async def compute_pyigrf(point_array: StringifiedPointArray):
     except (KeyError, ValueError):
         raise HTTPException(status_code=400, detail="Invalid point format. Each point should be an object with 'latitude', 'longitude', 'altitude', and 'year' fields")
 
+# For Render deployment - get the port from the environment variable or use 8000 as default
+port = int(os.environ.get("PORT", 8000))
+
 if __name__ == "__main__":
     # Run the application with Uvicorn, binding to all network interfaces (0.0.0.0)
     # This makes the API accessible via the server's IP address
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)
