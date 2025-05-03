@@ -44,6 +44,8 @@ The repository includes the following configuration files for Render deployment:
 - `requirements.txt`: Lists all Python dependencies
 - `Procfile`: Specifies the command to start the application
 - `runtime.txt`: Specifies the Python version (3.9.0)
+- `render.yaml`: Specifies the build command, start command, and environment variables
+- `predeploy.sh`: A script that runs during deployment to copy custom files to the pyIGRF site-packages folder
 
 ### Environment Variables
 
@@ -53,6 +55,18 @@ Render automatically sets the following environment variables:
 - `RENDER`: Set to `true` when running on Render
 
 No additional environment variables are required for this application.
+
+### Custom Files for pyIGRF
+
+The application uses the pyIGRF package to calculate IGRF variations. If you have custom versions of the following files, you can include them in your repository and they will be automatically copied to the pyIGRF site-packages folder during deployment:
+
+- `custom_loadCoeffs.py`: A custom version of the loadCoeffs.py file from the pyIGRF package
+- `custom_igrf14coeffs.txt`: A custom version of the igrf14coeffs.txt file from the pyIGRF package
+
+To use custom files:
+
+1. Place your custom files in the root directory of your repository with the names `custom_loadCoeffs.py` and/or `custom_igrf14coeffs.txt`
+2. The predeploy script will automatically detect these files and copy them to the appropriate locations in the pyIGRF site-packages folder during deployment
 
 ### Deployment Steps
 
@@ -66,8 +80,9 @@ No additional environment variables are required for this application.
    - Environment: Select "Python 3"
    - Region: Choose a region close to your users
    - Branch: Select the branch to deploy (usually "main" or "master")
-   - Build Command: `pip install -r requirements.txt`
+   - Build Command: `pip install -r requirements.txt && ./predeploy.sh`
    - Start Command: `uvicorn main:app --host=0.0.0.0 --port=$PORT`
+   - Note: If you're using the render.yaml file, these commands will be automatically configured
 
 3. **Create the Web Service**
    - Click "Create Web Service"
@@ -108,6 +123,11 @@ No additional environment variables are required for this application.
    - Verify that the Procfile contains the correct command to start the application
    - Check that the application is listening on the port specified by the PORT environment variable
    - If you encounter CORS issues, verify that the CORS middleware is correctly configured
+   - If you're using custom files for pyIGRF:
+     - Check that the custom files are correctly named (`custom_loadCoeffs.py` and/or `custom_igrf14coeffs.txt`)
+     - Verify that the predeploy script has execute permissions (`chmod +x predeploy.sh`)
+     - Check the build logs for any errors related to the predeploy script
+     - If the predeploy script fails, you can manually copy the custom files to the pyIGRF site-packages folder after deployment
 
 ### Testing the Deployed API
 
