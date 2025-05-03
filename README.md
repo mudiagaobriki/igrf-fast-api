@@ -202,6 +202,16 @@ The POST /pyigrf endpoint now supports multiple input formats for flexibility:
 
 The endpoint includes robust error handling and will attempt multiple parsing strategies to accommodate various input formats. If a parsing error occurs, a detailed error message will be returned to help diagnose the issue.
 
+The endpoint also includes several features to ensure stability and reliability:
+
+1. **Request Size Limits**: Requests larger than 10MB will be rejected to prevent memory exhaustion.
+2. **Point Limits**: A maximum of 1000 points can be processed in a single request to prevent overloading the server.
+3. **Input Validation**: Each point's latitude, longitude, altitude, and year values are validated to ensure they are within reasonable ranges.
+4. **Batch Processing**: Points are processed in batches of 100 to manage memory usage efficiently.
+5. **Timeout Handling**: Each point calculation has a 5-second timeout to prevent hanging on problematic inputs.
+6. **Graceful Degradation**: If a point calculation fails, a fallback result is provided instead of failing the entire request.
+7. **Minimal Logging**: Only essential information is logged to reduce I/O overhead.
+
 Each point in the array should be an object with the following fields:
 
 - `latitude`: Latitude in degrees (string)

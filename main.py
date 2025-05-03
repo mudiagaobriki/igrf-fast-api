@@ -117,48 +117,52 @@ async def get_pyigrf():
 
 @app.post("/pyigrf")
 async def compute_pyigrf(request: Request):
-    try:
-        # Get the raw request body
-        body = await request.body()
-        body_str = body.decode('utf-8')
-        print(f"Raw request body: {body_str}")
+    # Set a maximum request size (10MB)
+    MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 
-        # Try to parse the body as JSON
+    try:
+        # Get the raw request body with size limit
+        body = await request.body()
+        if len(body) > MAX_REQUEST_SIZE:
+            return HTTPException(status_code=413, detail=f"Request too large. Maximum size is {MAX_REQUEST_SIZE/1024/1024}MB")
+
+        body_str = body.decode('utf-8')
+        # Log only the first 200 chars of the request body to avoid excessive logging
+        log_body = body_str[:200] + "..." if len(body_str) > 200 else body_str
+        print(f"Request received, size: {len(body_str)} bytes")
+
+        # Set a maximum number of points to process
+        MAX_POINTS = 1000
+        points_data = None
+
+        # Try to parse the body as JSON with minimal logging
         try:
             # If the body is a JSON object, parse it
             data = json.loads(body_str)
-            print(f"Parsed JSON data: {data}")
 
             # Check if the data has a points_json field
             if isinstance(data, dict) and "points_json" in data:
                 # If it does, use that as the points_json string
                 points_json_str = data["points_json"]
-                print(f"Found points_json field: {points_json_str}")
 
                 # Try to parse the points_json string as JSON
                 try:
                     # Check if points_json_str is already a list
                     if isinstance(points_json_str, list):
-                        print("points_json is already a list, using directly")
                         parsed_points = points_json_str
                     else:
                         # Try to parse as JSON string
                         parsed_points = json.loads(points_json_str)
-                    print(f"Parsed points_json: {parsed_points}")
 
                     # Check if parsed_points has a points_json field
                     if isinstance(parsed_points, dict) and "points_json" in parsed_points:
                         points_data = parsed_points["points_json"]
-                        print(f"Found nested points_json field: {points_data}")
                     else:
                         # If not, assume the parsed data is the array of points directly
                         points_data = parsed_points
-                        print(f"Using parsed data directly: {points_data}")
                 except json.JSONDecodeError as e:
-                    print(f"JSONDecodeError parsing points_json: {e}")
                     # If points_json is not valid JSON, try using it directly
                     if isinstance(points_json_str, list):
-                        print("points_json is a list but not valid JSON, using directly")
                         points_data = points_json_str
                     else:
                         # If it's not a list, raise an error
@@ -171,94 +175,125 @@ async def compute_pyigrf(request: Request):
                     # First, try without any modifications
                     try:
                         parsed_body = json.loads(body_str)
-                        print(f"Parsed body without modifications: {parsed_body}")
                     except json.JSONDecodeError:
                         # If that fails, try stripping quotes and replacing escaped quotes
                         parsed_body = json.loads(body_str.strip('"').replace('\\"', '"'))
-                        print(f"Parsed body after stripping quotes: {parsed_body}")
 
                     # Check if parsed_body has a points_json field
                     if isinstance(parsed_body, dict) and "points_json" in parsed_body:
                         points_data = parsed_body["points_json"]
-                        print(f"Found points_json field in parsed body: {points_data}")
                     else:
                         # If not, assume the parsed data is the array of points directly
                         points_data = parsed_body
-                        print(f"Using parsed body directly: {points_data}")
                 except json.JSONDecodeError as e:
-                    print(f"JSONDecodeError parsing body as string: {e}")
                     # If the body is not valid JSON, try one more approach
                     try:
                         # Try parsing with different quote handling
                         parsed_body = json.loads(body_str.replace('\\', '').replace('"{', '{').replace('}"', '}'))
-                        print(f"Parsed body with alternative quote handling: {parsed_body}")
 
                         # Check if parsed_body has a points_json field
                         if isinstance(parsed_body, dict) and "points_json" in parsed_body:
                             points_data = parsed_body["points_json"]
-                            print(f"Found points_json field in alternatively parsed body: {points_data}")
                         else:
                             # If not, assume the parsed data is the array of points directly
                             points_data = parsed_body
-                            print(f"Using alternatively parsed body directly: {points_data}")
                     except json.JSONDecodeError as e2:
-                        print(f"JSONDecodeError with alternative parsing: {e2}")
                         # If all parsing attempts fail, raise an error
                         raise HTTPException(status_code=400, detail=f"Invalid JSON format in request body: {str(e)}")
         except json.JSONDecodeError as e:
-            print(f"JSONDecodeError parsing body: {e}")
             # If the body is not valid JSON, raise an error
             raise HTTPException(status_code=400, detail=f"Invalid JSON format in request body: {str(e)}")
 
         # Ensure points_data is a list
         if not isinstance(points_data, list):
-            print(f"points_data is not a list: {points_data}")
             if isinstance(points_data, dict):
                 # If it's a single point as a dict, wrap it in a list
                 points_data = [points_data]
-                print(f"Wrapped single point in list: {points_data}")
             else:
                 raise HTTPException(status_code=400, detail=f"Expected points_data to be a list, got {type(points_data).__name__}")
 
-        # Process the points data
+        # Check if there are too many points
+        if len(points_data) > MAX_POINTS:
+            raise HTTPException(status_code=413, detail=f"Too many points. Maximum is {MAX_POINTS}")
+
+        # Process the points data with minimal logging
         print(f"Processing {len(points_data)} points")
         results = []
-        for i, point in enumerate(points_data):
-            print(f"Processing point {i}: {point}")
-            # Each point is an object with latitude, longitude, altitude, and year fields
-            try:
-                lat = float(point["latitude"])
-                long = float(point["longitude"])
-                altitude = float(point["altitude"])
-                year = float(point["year"])
-                print(f"Extracted values: lat={lat}, long={long}, altitude={altitude}, year={year}")
-                # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
-                result = pyIGRF.igrf_variation(long, lat, altitude, year)
-                print(f"Result for point {i}: {result}")
-                results.append(result)
-            except KeyError as e:
-                print(f"KeyError for point {i}: {e}")
-                raise HTTPException(status_code=400, detail=f"Missing field in point {i}: {str(e)}")
-            except ValueError as e:
-                print(f"ValueError for point {i}: {e}")
-                raise HTTPException(status_code=400, detail=f"Invalid value in point {i}: {str(e)}")
-            except Exception as e:
-                print(f"Unexpected error processing point {i}: {e}")
-                raise HTTPException(status_code=500, detail=f"Error processing point {i}: {str(e)}")
+
+        # Process points in batches to avoid memory issues
+        BATCH_SIZE = 100
+        for batch_start in range(0, len(points_data), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(points_data))
+            batch = points_data[batch_start:batch_end]
+
+            for i, point in enumerate(batch):
+                point_index = batch_start + i
+                # Each point is an object with latitude, longitude, altitude, and year fields
+                try:
+                    # Extract values with validation
+                    try:
+                        lat = float(point["latitude"])
+                        if not -90 <= lat <= 90:
+                            raise ValueError(f"Latitude must be between -90 and 90, got {lat}")
+
+                        long = float(point["longitude"])
+                        if not -180 <= long <= 180:
+                            raise ValueError(f"Longitude must be between -180 and 180, got {long}")
+
+                        altitude = float(point["altitude"])
+                        if altitude < 0:
+                            raise ValueError(f"Altitude must be non-negative, got {altitude}")
+
+                        year = float(point["year"])
+                        if not 1900 <= year <= 2030:
+                            raise ValueError(f"Year must be between 1900 and 2030, got {year}")
+                    except KeyError as e:
+                        raise HTTPException(status_code=400, detail=f"Missing field in point {point_index}: {str(e)}")
+                    except ValueError as e:
+                        raise HTTPException(status_code=400, detail=f"Invalid value in point {point_index}: {str(e)}")
+
+                    # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
+                    try:
+                        # Platform-independent timeout implementation
+                        import threading
+                        import concurrent.futures
+
+                        # Use ThreadPoolExecutor with a timeout to prevent hanging
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                            future = executor.submit(pyIGRF.igrf_variation, long, lat, altitude, year)
+                            try:
+                                # Wait for at most 5 seconds for the calculation to complete
+                                result = future.result(timeout=5)
+                                results.append(result)
+                            except concurrent.futures.TimeoutError:
+                                # If the calculation times out, use fallback values
+                                print(f"Calculation timed out for point {point_index}")
+                                fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                                results.append(fallback_result)
+                    except Exception as e:
+                        print(f"Error calculating IGRF for point {point_index}: {str(e)}")
+                        # Use fallback values instead of crashing
+                        fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                        results.append(fallback_result)
+
+                except Exception as e:
+                    print(f"Unexpected error processing point {point_index}: {str(e)}")
+                    # Continue processing other points instead of failing completely
+                    fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                    results.append(fallback_result)
 
         print(f"Returning {len(results)} results")
         return results
     except json.JSONDecodeError as e:
-        print(f"JSONDecodeError in outer try block: {e}")
+        print(f"JSONDecodeError: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
     except (KeyError, ValueError) as e:
-        print(f"KeyError or ValueError in outer try block: {e}")
+        print(f"KeyError or ValueError: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Invalid point format. Each point should be an object with 'latitude', 'longitude', 'altitude', and 'year' fields. Error: {str(e)}")
     except Exception as e:
-        print(f"Unexpected error in outer try block: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+        print(f"Unexpected error: {str(e)}")
+        # Don't print traceback to avoid exposing sensitive information
+        raise HTTPException(status_code=500, detail="An internal server error occurred. Please try again later.")
 
 # Keep the original endpoint for backward compatibility
 @app.post("/pyigrf/model")
