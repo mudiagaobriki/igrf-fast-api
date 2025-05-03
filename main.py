@@ -118,7 +118,7 @@ async def get_pyigrf():
 @app.post("/pyigrf")
 async def compute_pyigrf(request: Request):
     # Set a maximum request size (10MB)
-    MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB in bytes
+    MAX_REQUEST_SIZE = 1000 * 1024 * 1024  # 10MB in bytes
 
     try:
         # Get the raw request body with size limit
