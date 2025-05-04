@@ -266,7 +266,26 @@ async def compute_pyigrf(request: Request):
                             try:
                                 # Wait for at most 5 seconds for the calculation to complete
                                 result = future.result(timeout=5)
-                                results.append(result)
+
+                                # Check if the point has additional fields like declination, horizontal intensity, etc.
+                                # If so, we'll use those values instead of calculating them
+                                if all(key in point for key in ["declination", "horizontal intensity", "inclination", "total intensity", "vertical intensity"]):
+                                    # Create a result object with all the fields from the input point
+                                    point_result = {
+                                        "latitude": lat,
+                                        "longitude": long,
+                                        "altitude": altitude,
+                                        "year": year,
+                                        "declination": float(point["declination"]),
+                                        "horizontal_intensity": float(point["horizontal intensity"]),
+                                        "inclination": float(point["inclination"]),
+                                        "total_intensity": float(point["total intensity"]),
+                                        "vertical_intensity": float(point["vertical intensity"])
+                                    }
+                                    results.append(point_result)
+                                else:
+                                    # If the point doesn't have the additional fields, use the calculated result
+                                    results.append(result)
                             except concurrent.futures.TimeoutError:
                                 # If the calculation times out, use fallback values
                                 print(f"Calculation timed out for point {point_index}")
