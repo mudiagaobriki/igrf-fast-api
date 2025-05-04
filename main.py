@@ -132,7 +132,7 @@ async def compute_pyigrf(request: Request):
         print(f"Request received, size: {len(body_str)} bytes")
 
         # Set a maximum number of points to process
-        MAX_POINTS = 1000
+        MAX_POINTS = 1000000
         points_data = None
 
         # Try to parse the body as JSON with minimal logging
