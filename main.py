@@ -113,7 +113,7 @@ async def get_point(point_id: int)->DataPoint:
 
 @app.get("/pyigrf/")
 async def get_pyigrf():
-    return pyIGRF.igrf_variation(100,100,500,2024.9)
+    return pyIGRF.igrf_variation(300,300,500,2024.9)
 
 @app.post("/pyigrf")
 async def compute_pyigrf(request: Request):
