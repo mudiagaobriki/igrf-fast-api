@@ -9,3 +9,17 @@ GET http://127.0.0.1:8000/hello/User
 Accept: application/json
 
 ###
+
+# Test the /pyigrf endpoint with the specified input format
+POST http://127.0.0.1:8000/pyigrf
+Content-Type: application/json
+
+[
+  {"latitude":"13.9375","longitude":"4.0625","altitude":"253.74992","year":"2024.9"},
+  {"latitude":"13.9375","longitude":"4.1875","altitude":"255.7499","year":"2024.9"},
+  {"latitude":"13.8125","longitude":"4.0625","altitude":"301.00001","year":"2024.9"},
+  {"latitude":"13.8125","longitude":"4.1875","altitude":"307.25054","year":"2024.9"},
+  {"latitude":"13.9375","longitude":"4.3125","altitude":"275.74988","year":"2024.9"}
+]
+
+###
