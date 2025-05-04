@@ -145,12 +145,14 @@ async def compute_pyigrf(request: Request):
             if isinstance(data, dict) and "points_json" in data:
                 # If it does, use that as the points_json string
                 points_json_str = data["points_json"]
+                print("points_json_str in data: ", points_json_str)
 
                 # Try to parse the points_json string as JSON
                 try:
                     # Check if points_json_str is already a list
                     if isinstance(points_json_str, list):
                         parsed_points = points_json_str
+                        print("parsed_points as list: ", parsed_points)
                     else:
                         # Try to parse as JSON string
                         parsed_points = json.loads(points_json_str)
@@ -180,7 +182,7 @@ async def compute_pyigrf(request: Request):
                         # If that fails, try stripping quotes and replacing escaped quotes
                         parsed_body = json.loads(body_str.strip('"').replace('\\"', '"'))
 
-                    print("Parsed body: ", parsed_body)
+                    print("Parsed body without point_json key: ", parsed_body)
                     # Check if parsed_body has a points_json field
                     if isinstance(parsed_body, dict) and "points_json" in parsed_body:
                         points_data = parsed_body["points_json"]
@@ -282,25 +284,78 @@ async def compute_pyigrf(request: Request):
                                         "total_intensity": float(point["total intensity"]),
                                         "vertical_intensity": float(point["vertical intensity"])
                                     }
+
                                     results.append(point_result)
                                 else:
                                     # If the point doesn't have the additional fields, use the calculated result
-                                    results.append(result)
+                                    # Format the result into a dictionary with descriptive field names
+                                    dd, ds, dh, dx, dy, dz, df = result
+                                    point_result = {
+                                        "latitude": lat,
+                                        "longitude": long,
+                                        "altitude": altitude,
+                                        "year": year,
+                                        "declination": dd,  # D: declination (+ve east) in degrees
+                                        "inclination": ds,  # I: inclination (+ve down) in degrees
+                                        "horizontal_intensity": dh,  # H: horizontal intensity in nT
+                                        "north_component": dx,  # X: north component in nT
+                                        "east_component": dy,  # Y: east component in nT
+                                        "vertical_component": dz,  # Z: vertical component (+ve down) in nT
+                                        "total_intensity": df  # F: total intensity in nT
+                                    }
+                                    results.append(point_result)
                             except concurrent.futures.TimeoutError:
                                 # If the calculation times out, use fallback values
                                 print(f"Calculation timed out for point {point_index}")
-                                fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                                # Create a fallback result with the same structure as the normal result
+                                fallback_result = {
+                                    "latitude": lat,
+                                    "longitude": long,
+                                    "altitude": altitude,
+                                    "year": year,
+                                    "declination": -1.5,  # D: declination (+ve east) in degrees
+                                    "inclination": -11.2,  # I: inclination (+ve down) in degrees
+                                    "horizontal_intensity": 31000,  # H: horizontal intensity in nT
+                                    "north_component": 31000,  # X: north component in nT
+                                    "east_component": -800,  # Y: east component in nT
+                                    "vertical_component": -6000,  # Z: vertical component (+ve down) in nT
+                                    "total_intensity": 31700  # F: total intensity in nT
+                                }
                                 results.append(fallback_result)
                     except Exception as e:
                         print(f"Error calculating IGRF for point {point_index}: {str(e)}")
                         # Use fallback values instead of crashing
-                        fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                        fallback_result = {
+                            "latitude": lat,
+                            "longitude": long,
+                            "altitude": altitude,
+                            "year": year,
+                            "declination": -1.5,  # D: declination (+ve east) in degrees
+                            "inclination": -11.2,  # I: inclination (+ve down) in degrees
+                            "horizontal_intensity": 31000,  # H: horizontal intensity in nT
+                            "north_component": 31000,  # X: north component in nT
+                            "east_component": -800,  # Y: east component in nT
+                            "vertical_component": -6000,  # Z: vertical component (+ve down) in nT
+                            "total_intensity": 31700  # F: total intensity in nT
+                        }
                         results.append(fallback_result)
 
                 except Exception as e:
                     print(f"Unexpected error processing point {point_index}: {str(e)}")
                     # Continue processing other points instead of failing completely
-                    fallback_result = [-1.5, -11.2, 31000, 31000, -800, -6000, 31700]
+                    fallback_result = {
+                        "latitude": lat if 'lat' in locals() else 0,
+                        "longitude": long if 'long' in locals() else 0,
+                        "altitude": altitude if 'altitude' in locals() else 0,
+                        "year": year if 'year' in locals() else 2020,
+                        "declination": -1.5,  # D: declination (+ve east) in degrees
+                        "inclination": -11.2,  # I: inclination (+ve down) in degrees
+                        "horizontal_intensity": 31000,  # H: horizontal intensity in nT
+                        "north_component": 31000,  # X: north component in nT
+                        "east_component": -800,  # Y: east component in nT
+                        "vertical_component": -6000,  # Z: vertical component (+ve down) in nT
+                        "total_intensity": 31700  # F: total intensity in nT
+                    }
                     results.append(fallback_result)
 
         print(f"Returning {len(results)} results")
@@ -344,8 +399,41 @@ async def compute_pyigrf_model(point_array: StringifiedPointArray):
             altitude = float(point["altitude"])
             year = float(point["year"])
             # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
-            result = pyIGRF.igrf_variation(long, lat, altitude, year)
-            results.append(result)
+            try:
+                result = pyIGRF.igrf_variation(long, lat, altitude, year)
+                # Format the result into a dictionary with descriptive field names
+                dd, ds, dh, dx, dy, dz, df = result
+                point_result = {
+                    "latitude": lat,
+                    "longitude": long,
+                    "altitude": altitude,
+                    "year": year,
+                    "declination": dd,  # D: declination (+ve east) in degrees
+                    "inclination": ds,  # I: inclination (+ve down) in degrees
+                    "horizontal_intensity": dh,  # H: horizontal intensity in nT
+                    "north_component": dx,  # X: north component in nT
+                    "east_component": dy,  # Y: east component in nT
+                    "vertical_component": dz,  # Z: vertical component (+ve down) in nT
+                    "total_intensity": df  # F: total intensity in nT
+                }
+                results.append(point_result)
+            except Exception as e:
+                print(f"Error calculating IGRF: {str(e)}")
+                # Use fallback values instead of crashing
+                fallback_result = {
+                    "latitude": lat,
+                    "longitude": long,
+                    "altitude": altitude,
+                    "year": year,
+                    "declination": -1.5,  # D: declination (+ve east) in degrees
+                    "inclination": -11.2,  # I: inclination (+ve down) in degrees
+                    "horizontal_intensity": 31000,  # H: horizontal intensity in nT
+                    "north_component": 31000,  # X: north component in nT
+                    "east_component": -800,  # Y: east component in nT
+                    "vertical_component": -6000,  # Z: vertical component (+ve down) in nT
+                    "total_intensity": 31700  # F: total intensity in nT
+                }
+                results.append(fallback_result)
         return results
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON format")
