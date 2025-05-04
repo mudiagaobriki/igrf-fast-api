@@ -113,7 +113,7 @@ async def get_point(point_id: int)->DataPoint:
 
 @app.get("/pyigrf/")
 async def get_pyigrf():
-    return pyIGRF.igrf_variation(100,100,500,2024.9)
+    return pyIGRF.igrf_value(100,100,500,2024.9)
 
 @app.post("/pyigrf")
 async def compute_pyigrf(request: Request):
@@ -256,7 +256,7 @@ async def compute_pyigrf(request: Request):
                     except ValueError as e:
                         raise HTTPException(status_code=400, detail=f"Invalid value in point {point_index}: {str(e)}")
 
-                    # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
+                    # Note: pyIGRF.igrf_value expects parameters in the order (long, lat, altitude, year)
                     try:
                         # Platform-independent timeout implementation
                         import threading
@@ -264,7 +264,7 @@ async def compute_pyigrf(request: Request):
 
                         # Use ThreadPoolExecutor with a timeout to prevent hanging
                         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                            future = executor.submit(pyIGRF.igrf_variation, long, lat, altitude, year)
+                            future = executor.submit(pyIGRF.igrf_value, long, lat, altitude, year)
                             try:
                                 # Wait for at most 5 seconds for the calculation to complete
                                 result = future.result(timeout=5)
@@ -398,9 +398,9 @@ async def compute_pyigrf_model(point_array: StringifiedPointArray):
             long = float(point["longitude"])
             altitude = float(point["altitude"])
             year = float(point["year"])
-            # Note: pyIGRF.igrf_variation expects parameters in the order (long, lat, altitude, year)
+            # Note: pyIGRF.igrf_value expects parameters in the order (long, lat, altitude, year)
             try:
-                result = pyIGRF.igrf_variation(long, lat, altitude, year)
+                result = pyIGRF.igrf_value(long, lat, altitude, year)
                 # Format the result into a dictionary with descriptive field names
                 dd, ds, dh, dx, dy, dz, df = result
                 point_result = {
